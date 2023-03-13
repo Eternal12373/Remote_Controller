@@ -1,7 +1,7 @@
 #include <ESP8266WiFi.h>
 #include <WiFiUdp.h>
 #include <SoftwareSerial.h>
-#include <Wire.h>  //定义iic的引脚
+#include <Wire.h> //定义iic的引脚
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
@@ -12,10 +12,10 @@
 // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
-#define STA 1  //连接热点
-#define AP 0   //作为热点
+#define STA 1 // 连接热点
+#define AP 0  // 作为热点
 const char *ssid = "TEST-WIFI";
-const char *password = "12345678"; //名字密码
+const char *password = "12345678"; // 名字密码
 const char *sta_ssid = "blue";
 const char *sta_password = "12345678";
 
@@ -38,7 +38,7 @@ String but_r;
 
 uint8_t send_buff[20];
 
-WiFiUDP Udp; //创建UDP对象
+WiFiUDP Udp; // 创建UDP对象
 
 int open_flag = 0; // ap开启成功失败标志位
 
@@ -46,12 +46,13 @@ IPAddress local_IP(192, 168, 1, 1);
 IPAddress gateway(192, 168, 4, 9);
 IPAddress subnet(255, 255, 255, 0);
 
+void draw_text(char *str);
+
 void setup()
 {
+    Serial.begin(9600);
 
-    Wire.begin(10,11);  //使用其他io口作为iic的sda和scl
-
-    pinMode(2, OUTPUT);  //指示灯
+    pinMode(2, OUTPUT); // 指示灯
     digitalWrite(2, LOW);
     if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
     { // Address 0x3D for 128x64
@@ -61,16 +62,11 @@ void setup()
     }
 
     /*-----初始化------*/
-    delay(2000);
+    display.display();
+    delay(2000); // Pause for 2 seconds
+
+    // Clear the buffer
     display.clearDisplay();
-
-    display.setTextSize(2);
-    display.setTextColor(WHITE);
-
-    pinMode(2, OUTPUT);
-    digitalWrite(2, HIGH);
-
-    Serial.begin(9600);
 
 #if AP
 
@@ -78,8 +74,8 @@ void setup()
 
     WiFi.softAPConfig(local_IP, gateway, subnet);
     Serial.printf("设置接入点中 ... ");
-    WiFi.softAP(ssid, password, 3, 1);       //启动AP网络
-    open_flag = WiFi.softAP(ssid, password); //监控状态变量result
+    WiFi.softAP(ssid, password, 3, 1);       // 启动AP网络
+    open_flag = WiFi.softAP(ssid, password); // 监控状态变量result
     if (open_flag)
     {
         Serial.println("开启成功");
@@ -95,25 +91,35 @@ void setup()
     WiFi.mode(WIFI_STA);
     /*------------------连接网络-------------------*/
     WiFi.begin(sta_ssid, sta_password);
+
+    display.clearDisplay();
+    display.setTextSize(1.5);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(0, 30);
+    display.print("Connecting");
+
     while (WiFi.status() != WL_CONNECTED)
     {
-        delay(500);
+        display.print(".");
         Serial.print(".");
+        display.display();
+        delay(500);
     }
     Serial.println("Connected");
     Serial.print("IP Address:");
     Serial.println(WiFi.localIP());
 
-    display.setCursor(0, 20);
-    display.print(WiFi.localIP());
+    display.clearDisplay();
 
-    display.setCursor(0, 40);
-    display.print("hello world");
-
+    display.setTextSize(2);              // Normal 1:1 pixel scale
+    display.setTextColor(SSD1306_WHITE); // Draw white text
+    display.setCursor(0, 30);            // Start at top-left corner
+    display.println(WiFi.localIP());
+    display.display();
 
 #endif
 
-    Udp.begin(3000); //服务器启动监听端口号
+    Udp.begin(3000); // 服务器启动监听端口号
     digitalWrite(2, HIGH);
     delay(500);
     digitalWrite(2, LOW);
@@ -125,15 +131,15 @@ void loop()
     // display.display();
     delay(20);
     // Serial.println(WiFi.localIP());
-    //     Serial.println(WiFi.softAPgetStationNum()); //打印客户端连接数
+    //     Serial.println(WiFi.softAPgetStationNum()); //打印客户端连接
 
-    int packetSize = Udp.parsePacket(); //获取当前队首数据包长度
-    if (packetSize)                     //如果有数据可用
+    int packetSize = Udp.parsePacket(); // 获取当前队首数据包长度
+    if (packetSize)                     // 如果有数据可用
     {
         digitalWrite(2, LOW);
         char buf[packetSize + 1];
         String rx;
-        Udp.read(buf, packetSize); //读取当前包数据
+        Udp.read(buf, packetSize); // 读取当前包数据
         rx = buf;
 
         index1 = rx.indexOf(':', 0);
@@ -177,4 +183,15 @@ void loop()
         // Udp.write((const uint8_t *)buf, packetSize);       //复制数据到发送缓存
         // Udp.endPacket();                                   //发送数据
     }
+}
+
+void draw_text(char *str)
+{
+    display.clearDisplay();
+    display.setTextSize(2); // Draw 2X-scale text
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(10, 0);
+    display.println(str);
+    display.display(); // Show initial text
+    delay(100);
 }
