@@ -5,19 +5,37 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
-#define SCREEN_WIDTH 128 // OLED display width, in pixels
-#define SCREEN_HEIGHT 64 // OLED display height, in pixels
+#define LunarLobster 0
+#define KineticKudu 0
+#define JammyJellyfish 1
+#define ImpishIndri 0
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
 #define SCL_PIN 4
 #define SDA_PIN 5
-// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
+
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
-#define STA 1 // 连接热点
-#define AP 0  // 作为热点
 const char *ssid = "TEST-WIFI";
 const char *password = "12345678"; // 名字密码
-const char *sta_ssid = "blue";
+
+#if LunarLobster
+const char *sta_ssid = "LunarLobster";
 const char *sta_password = "12345678";
+#endif
+#if KineticKudu
+const char *sta_ssid = "KineticKudu";
+const char *sta_password = "12345678";
+#endif
+#if JammyJellyfish
+const char *sta_ssid = "JammyJellyfish";
+const char *sta_password = "12345678";
+#endif
+#if ImpishIndri
+const char *sta_ssid = "ImpishIndri";
+const char *sta_password = "12345678";
+#endif
 
 int index1;
 int index2;
@@ -38,70 +56,40 @@ String but_r;
 
 uint8_t send_buff[20];
 
-WiFiUDP Udp; // 创建UDP对象
+WiFiUDP Udp;
 
-int open_flag = 0; // ap开启成功失败标志位
-
-IPAddress local_IP(192, 168, 1, 1);
-IPAddress gateway(192, 168, 4, 9);
-IPAddress subnet(255, 255, 255, 0);
-
-void draw_text(char *str);
+int open_flag = 0;
 
 void setup()
 {
     Serial.begin(9600);
 
-    pinMode(2, OUTPUT); // 指示灯
+    pinMode(2, OUTPUT);
     digitalWrite(2, LOW);
     if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
-    { // Address 0x3D for 128x64
+    {
         Serial.println(F("SSD1306 allocation failed"));
         for (;;)
             ;
     }
-
-    /*-----初始化------*/
     display.display();
-    delay(2000); // Pause for 2 seconds
-
-    // Clear the buffer
+    delay(2000);
     display.clearDisplay();
-
-#if AP
-
-    WiFi.mode(WIFI_AP);
-
-    WiFi.softAPConfig(local_IP, gateway, subnet);
-    Serial.printf("设置接入点中 ... ");
-    WiFi.softAP(ssid, password, 3, 1);       // 启动AP网络
-    open_flag = WiFi.softAP(ssid, password); // 监控状态变量result
-    if (open_flag)
-    {
-        Serial.println("开启成功");
-        digitalWrite(2, LOW);
-    }
-    else
-    {
-        Serial.println("开启失败");
-    }
-#endif
-/**---------------------TCP Server端初始化---------------------------**/
-#if STA
+    /**---------------------TCP Server Init---------------------------**/
     WiFi.mode(WIFI_STA);
-    /*------------------连接网络-------------------*/
+    /*------------------connect to the internet-------------------*/
     WiFi.begin(sta_ssid, sta_password);
 
     display.clearDisplay();
-    display.setTextSize(1.5);
+    display.setTextSize(2);
     display.setTextColor(SSD1306_WHITE);
-    display.setCursor(0, 30);
+    display.setCursor(0, 0);
+    display.println(sta_password);
+    display.println(sta_ssid);
     display.print("Connecting");
 
     while (WiFi.status() != WL_CONNECTED)
     {
-        display.print(".");
-        Serial.print(".");
         display.display();
         delay(500);
     }
@@ -111,15 +99,13 @@ void setup()
 
     display.clearDisplay();
 
-    display.setTextSize(2);              // Normal 1:1 pixel scale
-    display.setTextColor(SSD1306_WHITE); // Draw white text
-    display.setCursor(0, 30);            // Start at top-left corner
+    display.setTextSize(2);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(0, 30);
     display.println(WiFi.localIP());
     display.display();
 
-#endif
-
-    Udp.begin(3000); // 服务器启动监听端口号
+    Udp.begin(3000);
     digitalWrite(2, HIGH);
     delay(500);
     digitalWrite(2, LOW);
@@ -128,18 +114,16 @@ void setup()
 
 void loop()
 {
-    // display.display();
-    delay(20);
-    // Serial.println(WiFi.localIP());
-    //     Serial.println(WiFi.softAPgetStationNum()); //打印客户端连接
-
-    int packetSize = Udp.parsePacket(); // 获取当前队首数据包长度
-    if (packetSize)                     // 如果有数据可用
+    static int err_cnt = 0;
+    delay(5);
+    int packetSize = Udp.parsePacket();
+    if (packetSize)
     {
-        digitalWrite(2, LOW);
+        err_cnt = 0;
+        digitalWrite(2, HIGH);
         char buf[packetSize + 1];
         String rx;
-        Udp.read(buf, packetSize); // 读取当前包数据
+        Udp.read(buf, packetSize);
         rx = buf;
 
         index1 = rx.indexOf(':', 0);
@@ -164,34 +148,12 @@ void loop()
         send_buff[2] = joy_y.toInt();
         send_buff[3] = (but_a.toInt() | (but_b.toInt() << 1) | but_x.toInt() << 2 | but_y.toInt() << 3 | but_l.toInt() << 4 | but_r.toInt() << 5);
         send_buff[4] = 0x55;
-
         Serial.write(send_buff, 5);
-
-        // Serial.println(joy_x.toInt());
-        // Serial.println(joy_y.toInt());
-        // Serial.println(send_buff[3]);
-
-        // Serial.print("Received: ");
-        // Serial.println(rx);
-        // Serial.print("From IP: ");
-        // Serial.println(Udp.remoteIP());
-        // Serial.print("From Port: ");
-        // Serial.println(Udp.remotePort());
-
-        // Udp.beginPacket(Udp.remoteIP(), Udp.remotePort()); //准备发送数据
-        // Udp.print("Received: ");                           //复制数据到发送缓存
-        // Udp.write((const uint8_t *)buf, packetSize);       //复制数据到发送缓存
-        // Udp.endPacket();                                   //发送数据
     }
-}
-
-void draw_text(char *str)
-{
-    display.clearDisplay();
-    display.setTextSize(2); // Draw 2X-scale text
-    display.setTextColor(SSD1306_WHITE);
-    display.setCursor(10, 0);
-    display.println(str);
-    display.display(); // Show initial text
-    delay(100);
+    else
+    {
+        err_cnt++;
+        if (err_cnt > 200)
+            digitalWrite(2, LOW);
+    }
 }
